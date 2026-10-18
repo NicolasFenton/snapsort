@@ -1,0 +1,10 @@
+/target
+/dist
+node_modules/
+__pycache__/
+.DS_Store
+
+# Local secrets (SUBQ_API_KEY etc.)
+.env
+.env.*
+!.env.example

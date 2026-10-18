@@ -1,0 +1,43 @@
+[package]
+name = "snapsort"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+description = "Classify and sort local images into folders using the SubQ Decisions API"
+license = "MIT"
+readme = "README.md"
+keywords = ["image", "photo", "classification", "cli", "subq"]
+categories = ["command-line-utilities", "multimedia::images"]
+exclude = ["/npm", "/scripts", "/.github", "/dist"]
+
+[[bin]]
+name = "snapsort"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0.104"
+base64 = "0.23.1"
+clap = { version = "4.6.7", features = ["derive", "env"] }
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
+indicatif = "0.18.6"
+# reqwest 0.13 renamed its TLS features; 0.12 keeps `rustls-tls` (ring backend, no C toolchain beyond cc).
+reqwest = { version = "0.12.28", default-features = false, features = ["json", "rustls-tls"] }
+rpassword = "7"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+tokio = { version = "1.53.3", features = ["full"] }
+walkdir = "2.5.0"
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+
+# Image decoding/resizing is unusably slow without optimizations, so optimize
+# dependencies even in debug builds and tests.
+[profile.dev.package."*"]
+opt-level = 3

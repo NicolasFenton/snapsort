@@ -1,0 +1,33 @@
+{
+  "name": "snapsort",
+  "version": "0.1.0",
+  "description": "Classify and sort local images into folders using the SubQ Decisions API",
+  "keywords": [
+    "image",
+    "photo",
+    "sort",
+    "organize",
+    "classify",
+    "cli",
+    "subq"
+  ],
+  "license": "MIT",
+  "bin": {
+    "snapsort": "bin/snapsort.js"
+  },
+  "files": [
+    "bin/snapsort.js",
+    "platforms.json"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "optionalDependencies": {
+    "@snapsort/darwin-arm64": "0.1.0",
+    "@snapsort/darwin-x64": "0.1.0",
+    "@snapsort/linux-arm64": "0.1.0",
+    "@snapsort/linux-x64": "0.1.0",
+    "@snapsort/win32-arm64": "0.1.0",
+    "@snapsort/win32-x64": "0.1.0"
+  }
+}
