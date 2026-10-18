@@ -63,15 +63,15 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write # GitHub release
-      id-token: write # npm provenance
+      id-token: write # npm trusted publishing and provenance
     env:
       DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
+          # Node 22 bundles npm 10, which can't use trusted publishing.
+          node-version: 24
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -82,24 +82,50 @@ jobs:
           if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then expect=(--expect-version "${GITHUB_REF_NAME#v}"); fi
           node scripts/npm/assemble.mjs --artifacts artifacts --out dist/npm --pack "${expect[@]}"
 
-      - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-          PRIVATE_REPO: ${{ github.event.repository.private }}
+      - name: Check trusted publishing
+        if: env.DRY_RUN == 'true'
         run: |
+          # A dry run uploads nothing, so it can't show whether npm accepts this
+          # workflow. Ask npm for each package's publish token the way
+          # `npm publish` does, and warn where no trusted publisher matches.
+          id_token=$(curl -sSf -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=npm:registry.npmjs.org" | jq -r .value)
+          for dir in dist/npm/*/; do
+            name=$(node -p "require('./$dir/package.json').name")
+            response=$(curl -sS -X POST -H "Authorization: Bearer $id_token" \
+              "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/${name/\//%2f}")
+            if jq -e .token > /dev/null 2>&1 <<< "$response"; then
+              echo "$name: trusted publishing is set up"
+            else
+              echo "::warning::$name: no trusted publisher on npmjs.com matches this workflow ($(jq -r '.message // "no details"' 2>/dev/null <<< "$response"))"
+            fi
+          done
+
+      - name: Publish to npm
+        run: |
+          # npm signs in with a short-lived token from the trusted publisher set up
+          # for each package on npmjs.com, and adds provenance on public repositories.
+          if ! printf '%s\n' 11.5.1 "$(npm --version)" | sort -V -C; then
+            echo "::error::Trusted publishing needs npm 11.5.1 or later; found $(npm --version)"
+            exit 1
+          fi
           flags=(--access public)
-          # npm only accepts provenance from public repositories.
-          if [[ "$PRIVATE_REPO" != "true" ]]; then flags+=(--provenance); fi
           if [[ "$DRY_RUN" == "true" ]]; then flags+=(--dry-run); fi
 
           publish() {
-            local dir="$1" name version
+            local dir="$1" name version status
             name=$(node -p "require('./$dir/package.json').name")
             version=$(node -p "require('./$dir/package.json').version")
-            if npm view "$name@$version" version > /dev/null 2>&1; then
-              echo "::notice::$name@$version is already published; skipping"
-              return
-            fi
+            # Look up this one version: the registry caches whole-package lookups
+            # (`npm view`) for up to 5 minutes, so checking a package that didn't
+            # exist yet kept it showing as missing after its first publish.
+            status=$(curl -sS -o /dev/null -w '%{http_code}' --retry 3 \
+              "https://registry.npmjs.org/${name/\//%2f}/$version")
+            case "$status" in
+              200) echo "::notice::$name@$version is already published; skipping"; return ;;
+              404) ;;
+              *) echo "::error::npm registry returned HTTP $status for $name@$version"; exit 1 ;;
+            esac
             local tag=()
             if [[ "$version" == *-* ]]; then tag=(--tag next); fi
             npm publish "$dir" "${flags[@]}" "${tag[@]}"

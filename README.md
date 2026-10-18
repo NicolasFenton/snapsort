@@ -323,9 +323,21 @@ One-time setup:
 
 1. Create the `snapsort` organization on npmjs.com; it owns the `@snapsort/*`
    platform packages.
-2. Add an npm automation token as the `NPM_TOKEN` repository secret.
-3. Optionally, once the packages exist, configure npm trusted publishing for
-   this repository.
+2. Publish every package once with an npm token. npm only allows trusted
+   publishing for a package that already exists. v0.1.0 did this for the
+   current packages; a platform added to `platforms.json` later needs the same.
+3. Set up trusted publishing for each of the seven packages (`snapsort` and
+   the six `@snapsort/*` packages), so the release workflow can publish
+   without a token. On the package's **Settings** tab on npmjs.com, under
+   **Trusted Publisher**, choose **GitHub Actions** and enter:
+   - Organization or user: `NicolasFenton`
+   - Repository: `snapsort`
+   - Workflow filename: `release.yml`
+   - Allowed actions: tick **npm publish**
+
+   A new trusted publisher expires unless a release publishes through it
+   within two days, so set them up right before a release. If one expires,
+   delete it and add it again.
 
 Then for each release:
 
@@ -340,14 +352,17 @@ Then for each release:
 
 The [release workflow](.github/workflows/release.yml) builds all six targets
 on native runners and checks that the tag matches `Cargo.toml`. It then
-publishes the platform packages followed by the launcher, with npm provenance
-on public repos. It skips versions that are already published, so a failed
-release can be re-run. Finally it creates a GitHub release with archives and
-`SHA256SUMS`. Versions with a prerelease suffix (`0.2.0-beta.1`) are
-published under the `next` dist-tag.
+publishes the platform packages followed by the launcher. npm accepts them
+through trusted publishing and adds provenance on public repos. The workflow
+skips versions that are already published, so a failed release can be re-run.
+Finally it creates a GitHub release with archives and `SHA256SUMS`. Versions
+with a prerelease suffix (`0.2.0-beta.1`) are published under the `next`
+dist-tag.
 
 To rehearse a release without publishing anything, run the workflow manually
-from the Actions tab with **dry run** checked.
+from the Actions tab with **dry run** checked. A dry run also asks npm about
+each package and warns about any whose trusted publisher doesn't match this
+workflow.
 
 The arm64 Linux and Windows builds use GitHub's `ubuntu-24.04-arm` and
 `windows-11-arm` runners. If those aren't available to your repository, remove

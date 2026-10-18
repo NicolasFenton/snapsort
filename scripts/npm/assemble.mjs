@@ -51,7 +51,7 @@ function writeJson(file, value) {
   fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-/** Set `repository` when building in GitHub Actions; npm provenance requires it. */
+/** Set `repository` when building in GitHub Actions; npm trusted publishing and provenance require it. */
 function repositoryField() {
   const repo = process.env.GITHUB_REPOSITORY;
   return repo ? { repository: { type: "git", url: `git+https://github.com/${repo}.git` } } : {};
