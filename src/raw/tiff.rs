@@ -80,7 +80,9 @@ impl<R: Read + Seek> Tiff<'_, R> {
         let bytes = read_at(self.reader, offset + 2, len)?;
         let (entries, next) = bytes.split_at(bytes.len() - 4);
         let entries = entries
-            .chunks_exact(12)
+            .as_chunks::<12>()
+            .0
+            .iter()
             .map(|e| Entry {
                 tag: self.u16(&e[0..2]),
                 kind: self.u16(&e[2..4]),
@@ -114,7 +116,12 @@ impl<R: Read + Seek> Tiff<'_, R> {
             ensure!(offset + len <= self.file_len, "SubIFD list is truncated");
             read_at(self.reader, offset, len)?
         };
-        Ok(bytes.chunks_exact(4).map(|b| self.u32(b).into()).collect())
+        Ok(bytes
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|b| self.u32(b).into())
+            .collect())
     }
 }
 
